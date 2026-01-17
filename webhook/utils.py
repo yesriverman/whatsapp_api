@@ -8,10 +8,8 @@ TOKEN = os.getenv("WHATSAPP_TOKEN")
 PHONE_ID = os.getenv("WHATSAPP_PHONE_ID")
 BASE_URL = f"https://graph.facebook.com/v17.0/{PHONE_ID}/messages"
 
+
 def send_whatsapp_message(to_number: str, message: str):
-    """
-    Send a WhatsApp text message via Cloud API
-    """
     headers = {
         "Authorization": f"Bearer {TOKEN}",
         "Content-Type": "application/json"
@@ -25,11 +23,38 @@ def send_whatsapp_message(to_number: str, message: str):
 
     try:
         response = requests.post(BASE_URL, headers=headers, json=payload)
+        print("WhatsApp API response status:", response.status_code)
+        print("WhatsApp API response body:", response.text)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
         print("Error sending WhatsApp message:", e)
         return {"error": str(e)}
+
+
+
+# def send_whatsapp_message(to_number: str, message: str):
+#     """
+#     Send a WhatsApp text message via Cloud API
+#     """
+#     headers = {
+#         "Authorization": f"Bearer {TOKEN}",
+#         "Content-Type": "application/json"
+#     }
+#     payload = {
+#         "messaging_product": "whatsapp",
+#         "to": to_number,
+#         "type": "text",
+#         "text": {"body": message}
+#     }
+
+#     try:
+#         response = requests.post(BASE_URL, headers=headers, json=payload)
+#         response.raise_for_status()
+#         return response.json()
+#     except requests.exceptions.RequestException as e:
+#         print("Error sending WhatsApp message:", e)
+#         return {"error": str(e)}
 
 
 # import os

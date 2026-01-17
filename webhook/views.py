@@ -23,23 +23,21 @@ def whatsapp_webhook(request):
             payload = json.loads(request.body.decode("utf-8"))
             print("Incoming WhatsApp message:", json.dumps(payload, indent=2))
 
-            # Extract messages
-            entries = payload.get("entry", [])
-            for entry in entries:
-                changes = entry.get("changes", [])
-                for change in changes:
+            for entry in payload.get("entry", []):
+                for change in entry.get("changes", []):
                     value = change.get("value", {})
-                    contacts = value.get("contacts", [])
                     messages = value.get("messages", [])
+                    contacts = value.get("contacts", [])
 
-                    for contact, msg in zip(contacts, messages):
-                        sender = contact.get("wa_id")
+                    for msg in messages:
+                        sender = msg.get("from")  # WhatsApp sender number
                         text = msg.get("text", {}).get("body", "")
 
                         if sender and text:
-                            reply_text = f"Echo: {text}"  # You can customize this
+                            reply_text = f"Echo: {text}"
                             response = send_whatsapp_message(sender, reply_text)
-                            print("Reply API response:", response)
+                            print("Reply sent. API response:", response)
+
 
         except Exception as e:
             print("Error processing incoming message:", e)
