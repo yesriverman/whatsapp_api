@@ -4,6 +4,7 @@ from django.shortcuts import render
 import json
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
+from .utils import send_whatsapp_message
 
 VERIFY_TOKEN = "my_verify_token_123"  # change later
 
@@ -19,12 +20,32 @@ def whatsapp_webhook(request):
             return HttpResponse(challenge)
         return HttpResponse("Verification failed", status=403)
 
-    # 🔹 Incoming messages (POST)
+
+
     if request.method == "POST":
         payload = json.loads(request.body.decode("utf-8"))
         print("Incoming WhatsApp message:", json.dumps(payload, indent=2))
+
+        # Auto-reply example
+        try:
+            contacts = payload.get("entry", [])[0]["changes"][0]["value"]["contacts"]
+            msgs = payload.get("entry", [])[0]["changes"][0]["value"]["messages"]
+            for contact, msg in zip(contacts, msgs):
+                sender = contact["wa_id"]
+                text = msg.get("text", {}).get("body", "")
+                # simple auto-reply
+                send_whatsapp_message(sender, f"Echo: {text}")
+        except Exception as e:
+            print("Error processing message:", e)
+
         return JsonResponse({"status": "ok"})
 
-    return HttpResponse(status=405)
+    # # 🔹 Incoming messages (POST)
+    # if request.method == "POST":
+    #     payload = json.loads(request.body.decode("utf-8"))
+    #     print("Incoming WhatsApp message:", json.dumps(payload, indent=2))
+    #     return JsonResponse({"status": "ok"})
+
+    # return HttpResponse(status=405)
 
 
