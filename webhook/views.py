@@ -7,7 +7,7 @@ VERIFY_TOKEN = "my_verify_token_123"
 
 @csrf_exempt
 def whatsapp_webhook(request):
-    # 🔹 Verification (GET)
+    # GET verification
     if request.method == "GET":
         mode = request.GET.get("hub.mode")
         token = request.GET.get("hub.verify_token")
@@ -17,27 +17,28 @@ def whatsapp_webhook(request):
             return HttpResponse(challenge)
         return HttpResponse("Verification failed", status=403)
 
-    # 🔹 Incoming messages (POST)
+    # POST messages
     if request.method == "POST":
         try:
             payload = json.loads(request.body.decode("utf-8"))
             print("Incoming WhatsApp message:", json.dumps(payload, indent=2))
 
+            # Loop through all messages
             for entry in payload.get("entry", []):
                 for change in entry.get("changes", []):
                     value = change.get("value", {})
                     messages = value.get("messages", [])
-                    contacts = value.get("contacts", [])
 
                     for msg in messages:
-                        sender = msg.get("from")  # WhatsApp sender number
+                        sender = msg.get("from")       # <-- THIS MUST BE msg["from"]
                         text = msg.get("text", {}).get("body", "")
+                        msg_type = msg.get("type", "")
 
-                        if sender and text:
-                            reply_text = f"Echo: {text}"
-                            response = send_whatsapp_message(sender, reply_text)
-                            print("Reply sent. API response:", response)
-
+                        # Only respond to text messages
+                        if sender and text and msg_type == "text":
+                            print(f"Sending reply to {sender}: Echo: {text}")
+                            response = send_whatsapp_message(sender, f"Echo: {text}")
+                            print("API response:", response)
 
         except Exception as e:
             print("Error processing incoming message:", e)
@@ -45,6 +46,57 @@ def whatsapp_webhook(request):
         return JsonResponse({"status": "ok"})
 
     return HttpResponse(status=405)
+
+
+
+
+# import json
+# from django.http import JsonResponse, HttpResponse
+# from django.views.decorators.csrf import csrf_exempt
+# from .utils import send_whatsapp_message
+
+# VERIFY_TOKEN = "my_verify_token_123"
+
+# @csrf_exempt
+# def whatsapp_webhook(request):
+#     # 🔹 Verification (GET)
+#     if request.method == "GET":
+#         mode = request.GET.get("hub.mode")
+#         token = request.GET.get("hub.verify_token")
+#         challenge = request.GET.get("hub.challenge")
+
+#         if mode == "subscribe" and token == VERIFY_TOKEN:
+#             return HttpResponse(challenge)
+#         return HttpResponse("Verification failed", status=403)
+
+#     # 🔹 Incoming messages (POST)
+#     if request.method == "POST":
+#         try:
+#             payload = json.loads(request.body.decode("utf-8"))
+#             print("Incoming WhatsApp message:", json.dumps(payload, indent=2))
+
+#             for entry in payload.get("entry", []):
+#                 for change in entry.get("changes", []):
+#                     value = change.get("value", {})
+#                     messages = value.get("messages", [])
+#                     contacts = value.get("contacts", [])
+
+#                     for msg in messages:
+#                         sender = msg.get("from")  # WhatsApp sender number
+#                         text = msg.get("text", {}).get("body", "")
+
+#                         if sender and text:
+#                             reply_text = f"Echo: {text}"
+#                             response = send_whatsapp_message(sender, reply_text)
+#                             print("Reply sent. API response:", response)
+
+
+#         except Exception as e:
+#             print("Error processing incoming message:", e)
+
+#         return JsonResponse({"status": "ok"})
+
+#     return HttpResponse(status=405)
 
 
 
