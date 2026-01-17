@@ -1,57 +1,134 @@
+# webhook/views.py
 import json
-from django.http import JsonResponse, HttpResponse
+import logging
+from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from .utils import send_whatsapp_message
 
+from .utils import send_whatsapp_message
+from .huggingface_utils import get_hf_response
+
+# Configure logging
+logger = logging.getLogger(__name__)
+
+# Your keyword-based auto-replies
+KEYWORD_RESPONSES = {
+    "hello": "Hi there! How can I help you today?",
+    "help": "Sure! You can ask me anything about our services.",
+    "bye": "Goodbye! Have a nice day!"
+}
+
+# This token must match what you set in FB webhook
 VERIFY_TOKEN = "my_verify_token_123"
 
-KEYWORD_RESPONSES = {
-    "hello": "Hello! How can I help you today?",
-    "hi": "Hi there! How can I assist?",
-    "price": "Our prices start at $10.",
-    "cost": "Our prices start at $10.",
-    "hours": "We are open from 9am to 6pm.",
-    "time": "We are open from 9am to 6pm."
-}
 
 @csrf_exempt
 def whatsapp_webhook(request):
-    if request.method == "POST":
+    if request.method == "GET":
+        # Verification request from WhatsApp
+        mode = request.GET.get("hub.mode")
+        token = request.GET.get("hub.verify_token")
+        challenge = request.GET.get("hub.challenge")
+
+        if mode == "subscribe" and token == VERIFY_TOKEN:
+            logger.info("Webhook verified successfully.")
+            return HttpResponse(challenge)
+        else:
+            logger.warning("Webhook verification failed.")
+            return HttpResponse("Verification failed.", status=403)
+
+    elif request.method == "POST":
         try:
-            payload = json.loads(request.body.decode("utf-8"))
-            print("Incoming WhatsApp message:", json.dumps(payload, indent=2))
+            incoming = json.loads(request.body)
+            logger.info(f"Incoming WhatsApp message: {json.dumps(incoming)}")
 
-            for entry in payload.get("entry", []):
-                for change in entry.get("changes", []):
-                    value = change.get("value", {})
+            # Parse the message
+            entry = incoming.get("entry", [])
+            for e in entry:
+                changes = e.get("changes", [])
+                for c in changes:
+                    value = c.get("value", {})
                     messages = value.get("messages", [])
+                    for message in messages:
+                        sender_id = message["from"]
+                        user_text = message.get("text", {}).get("body", "")
 
-                    for msg in messages:
-                        sender = msg.get("from")
-                        text = msg.get("text", {}).get("body", "").lower()
-                        msg_type = msg.get("type", "")
+                        # Determine reply
+                        reply_text = KEYWORD_RESPONSES.get(user_text.lower())
+                        if not reply_text:
+                            # Fallback to Hugging Face AI
+                            reply_text = get_hf_response(user_text)
 
-                        if sender and text and msg_type == "text":
-                            # Keyword-based reply
-                            reply_text = None
-                            for keyword, response in KEYWORD_RESPONSES.items():
-                                if keyword in text:
-                                    reply_text = response
-                                    break
+                        # Send WhatsApp message
+                        response = send_whatsapp_message(sender_id, reply_text)
+                        logger.info(f"Sent reply to {sender_id}: {reply_text}")
+                        logger.info(f"WhatsApp API response: {response}")
 
-                            # Default fallback (OpenAI)
-                            if not reply_text:
-                                from .openai_utils import get_openai_response
-                                reply_text = get_openai_response(text)
-
-                            response = send_whatsapp_message(sender, reply_text)
-                            print(f"Reply sent to {sender}: {reply_text}")
-                            print("API response:", response)
-
+            return HttpResponse("OK", status=200)
         except Exception as e:
-            print("Error processing incoming message:", e)
+            logger.error(f"Error processing webhook: {e}")
+            return HttpResponse("Error", status=500)
 
-        return JsonResponse({"status": "ok"})
+    else:
+        return HttpResponse("Method not allowed", status=405)
+
+
+
+
+
+# import json
+# from django.http import JsonResponse, HttpResponse
+# from django.views.decorators.csrf import csrf_exempt
+# from .utils import send_whatsapp_message
+
+# VERIFY_TOKEN = "my_verify_token_123"
+
+# KEYWORD_RESPONSES = {
+#     "hello": "Hello! How can I help you today?",
+#     "hi": "Hi there! How can I assist?",
+#     "price": "Our prices start at $10.",
+#     "cost": "Our prices start at $10.",
+#     "hours": "We are open from 9am to 6pm.",
+#     "time": "We are open from 9am to 6pm."
+# }
+
+# @csrf_exempt
+# def whatsapp_webhook(request):
+#     if request.method == "POST":
+#         try:
+#             payload = json.loads(request.body.decode("utf-8"))
+#             print("Incoming WhatsApp message:", json.dumps(payload, indent=2))
+
+#             for entry in payload.get("entry", []):
+#                 for change in entry.get("changes", []):
+#                     value = change.get("value", {})
+#                     messages = value.get("messages", [])
+
+#                     for msg in messages:
+#                         sender = msg.get("from")
+#                         text = msg.get("text", {}).get("body", "").lower()
+#                         msg_type = msg.get("type", "")
+
+#                         if sender and text and msg_type == "text":
+#                             # Keyword-based reply
+#                             reply_text = None
+#                             for keyword, response in KEYWORD_RESPONSES.items():
+#                                 if keyword in text:
+#                                     reply_text = response
+#                                     break
+
+#                             # Default fallback (OpenAI)
+#                             if not reply_text:
+#                                 from .openai_utils import get_openai_response
+#                                 reply_text = get_openai_response(text)
+
+#                             response = send_whatsapp_message(sender, reply_text)
+#                             print(f"Reply sent to {sender}: {reply_text}")
+#                             print("API response:", response)
+
+#         except Exception as e:
+#             print("Error processing incoming message:", e)
+
+#         return JsonResponse({"status": "ok"})
 
 
 
