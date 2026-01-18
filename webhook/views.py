@@ -31,7 +31,8 @@ def whatsapp_webhook(request):
 
         if mode == "subscribe" and token == VERIFY_TOKEN:
             logger.info("Webhook verified successfully.")
-            return HttpResponse(challenge)
+            return HttpResponse(challenge, content_type="text/plain")
+
         else:
             logger.warning("Webhook verification failed.")
             return HttpResponse("Verification failed.", status=403)
@@ -51,6 +52,8 @@ def whatsapp_webhook(request):
                     for message in messages:
                         sender_id = message["from"]
                         user_text = message.get("text", {}).get("body", "")
+                    if not messages:
+                        continue
 
                         # Determine reply
                         reply_text = KEYWORD_RESPONSES.get(user_text.lower())
@@ -70,8 +73,6 @@ def whatsapp_webhook(request):
 
     else:
         return HttpResponse("Method not allowed", status=405)
-
-
 
 
 
